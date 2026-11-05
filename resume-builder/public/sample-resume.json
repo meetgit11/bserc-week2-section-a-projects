@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "app": "resume-builder",
+  "template": "modern-professional",
+  "order": [
+    "summary",
+    "experience",
+    "internships",
+    "education",
+    "skills",
+    "projects",
+    "certifications",
+    "achievements",
+    "positions"
+  ],
+  "data": {
+    "personal": {
+      "name": "Riya Sharma",
+      "title": "Aspiring Data Analyst",
+      "email": "riya@example.com",
+      "phone": "+91 98765 43210",
+      "location": "Pune, Maharashtra, India",
+      "link": "linkedin.com/in/riyasharma"
+    },
+    "summary": "Final-year B.Tech student in Computer Science with a strong foundation in Python, SQL and data visualisation. Built dashboards and analysis projects on real-world-style datasets, and completed a data-analytics internship where I cleaned messy data, built reports and presented findings to non-technical stakeholders. Looking for a data analyst internship where I can turn data into clear, useful decisions.",
+    "experience": [
+      {
+        "role": "Data Analytics Intern",
+        "company": "Nova Labs, Pune",
+        "dates": "Jun 2026 – Aug 2026",
+        "desc": "Cleaned and analysed sales data for 12,000+ orders in Python and Excel; built a weekly dashboard that cut manual reporting time by about half; presented findings to the operations team."
+      },
+      {
+        "role": "Teaching Assistant — DBMS Lab",
+        "company": "Pimpri Chinchwad University, Pune",
+        "dates": "Jan 2026 – May 2026",
+        "desc": "Helped 60 first-year students with SQL queries and ER diagrams; ran two revision sessions before the mid-semester exam; marked lab assignments against a shared rubric."
+      },
+      {
+        "role": "Freelance Data Entry & Reporting",
+        "company": "Local retail shop, Pune",
+        "dates": "Oct 2025 – Dec 2025",
+        "desc": "Digitised paper billing records into spreadsheets; produced a monthly summary of best-selling items; flagged stock items that had not sold in 90 days."
+      },
+      {
+        "role": "Volunteer — College Tech Fest",
+        "company": "Developers Club, PCU",
+        "dates": "Sep 2025",
+        "desc": "Managed registrations for 200+ participants; coordinated the judging schedule for a 24-hour hackathon; wrote the post-event summary report."
+      }
+    ],
+    "education": [
+      {
+        "degree": "B.Tech, Computer Science and Engineering",
+        "school": "Pimpri Chinchwad University, Pune",
+        "dates": "2024 – 2028",
+        "desc": "CGPA 8.9 (up to 4th semester). Relevant coursework: DBMS, Data Structures, Statistics, Machine Learning."
+      },
+      {
+        "degree": "Higher Secondary (Science)",
+        "school": "Kendriya Vidyalaya, Pune",
+        "dates": "2022 – 2024",
+        "desc": "Percentage: 91%. Subjects: Physics, Chemistry, Mathematics, Computer Science."
+      },
+      {
+        "degree": "Secondary School (Class X)",
+        "school": "Kendriya Vidyalaya, Pune",
+        "dates": "2022",
+        "desc": "Percentage: 93%. School topper in Mathematics."
+      }
+    ],
+    "skills": "Python, SQL, Excel, Power BI, Pandas, NumPy, Matplotlib, Data Cleaning, Data Visualisation, Git, GitHub, Communication, Problem Solving",
+    "projects": [
+      {
+        "name": "Sales Data Exploratory Analysis",
+        "desc": "Analysed 12,000+ orders to find top products, seasonal trends and slow-moving stock; built charts and a written summary of recommendations.",
+        "link": "github.com/riya-sharma/sales-analysis"
+      },
+      {
+        "name": "PDF Studio — Document Helper",
+        "desc": "A small offline tool that merges and splits PDF pages in the browser; built with HTML, CSS and JavaScript; no file is uploaded anywhere.",
+        "link": "github.com/riya-sharma/pdf-studio"
+      },
+      {
+        "name": "Student Attendance Dashboard",
+        "desc": "Power BI dashboard showing attendance by class and subject, with filters for month and teacher; used by two class coordinators.",
+        "link": ""
+      },
+      {
+        "name": "Climate Data Mini Project",
+        "desc": "Cleaned a public weather dataset, plotted temperature trends over ten years and wrote a two-page report on the findings.",
+        "link": ""
+      }
+    ],
+    "internships": [
+      {
+        "role": "Content & Data Intern",
+        "company": "LearnSphere, Pune",
+        "dates": "Jan 2026 – Mar 2026",
+        "desc": "Prepared practice datasets and answer keys for a data-analysis course; checked 200+ quiz questions for errors; wrote short explainers on SQL joins and window functions."
+      }
+    ],
+    "certifications": [
+      {
+        "title": "Google Data Analytics Professional Certificate",
+        "issuer": "Google / Coursera",
+        "year": "2026",
+        "detail": "Eight-course series: data cleaning, analysis, visualisation and R."
+      },
+      {
+        "title": "SQL for Data Science",
+        "issuer": "Coursera",
+        "year": "2025",
+        "detail": "Joins, subqueries, window functions and query optimisation."
+      }
+    ],
+    "achievements": [
+      {
+        "title": "Hackathon finalist — Smart India Hackathon (college round)",
+        "year": "2025",
+        "detail": "Built a dashboard prototype for campus energy use; one of 6 teams shortlisted from 40."
+      },
+      {
+        "title": "Best Poster — Department Research Day",
+        "year": "2026",
+        "detail": "Poster on visualising attendance data won the undergraduate category."
+      }
+    ],
+    "positions": [
+      {
+        "title": "Technical Lead",
+        "org": "Developers Club, Pimpri Chinchwad University",
+        "year": "2025 – 2026",
+        "detail": "Lead a 12-member team; organised two workshops on Python and SQL for 80+ students."
+      }
+    ]
+  }
+}

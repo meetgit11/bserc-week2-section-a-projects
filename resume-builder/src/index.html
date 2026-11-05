@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resume Builder — Offline, Single File</title>
+<!--
+  BSERC GenAI Internship — Week 2, Section A, Project 3: Resume Builder.
+  Single self-contained HTML file. No external fonts, images, scripts or
+  network requests. All data stays on this device (localStorage autosave
+  + optional .json file save/load). Sample data only: "Riya Sharma",
+  riya@example.com — a fake person from the Week 2 PDF preview.
+  Export: browser Print to PDF (File > Print, or the Export PDF button),
+  so the text in the PDF stays selectable and copyable.
+-->
+<style>
+  /* ---------- Base / layout (screen only) ---------- */
+  * { box-sizing: border-box; }
+  :root {
+    --ink: #1a1a1a; --muted: #555; --line: #ccc; --accent: #1f4e79;
+    --panel: #f4f4f4; --btn: #1f4e79;
+  }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Arial, Helvetica, sans-serif;
+    color: var(--ink); background: #e8e8e8; font-size: 14px; line-height: 1.45; }
+  header.app { background: #14263d; color: #fff; padding: 12px 18px; }
+  header.app h1 { margin: 0; font-size: 19px; }
+  header.app p { margin: 3px 0 0; font-size: 13px; color: #c9d6e4; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 18px;
+    background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
+  button, .file-label { font: inherit; cursor: pointer; border: 1px solid var(--btn);
+    background: var(--btn); color: #fff; border-radius: 6px; padding: 7px 12px; }
+  button.secondary, .file-label { background: #fff; color: var(--btn); }
+  button:hover, .file-label:hover { opacity: .88; }
+  .page-count { align-self: center; margin-left: auto; font-size: 13px; color: var(--muted); }
+  .layout { display: grid; grid-template-columns: 380px 1fr; gap: 18px;
+    padding: 18px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  /* Preview mode: editor hidden, only the A4 preview shows. */
+  body.preview-mode .editor { display: none; }
+  body.preview-mode .layout { grid-template-columns: 1fr; max-width: 240mm; margin: 0 auto; }
+  body.preview-mode .toolbar button:not(#btn-preview),
+  body.preview-mode .toolbar .file-label { display: none; }
+  /* Mobile editing: stack the panels, shrink the A4 sheet to the screen
+     width, keep controls usable and never scroll sideways. */
+  @media (max-width: 900px) {
+    .resume { width: 100%; min-height: auto; padding: 8mm 6mm; }
+    .preview-wrap { width: 100%; }
+    .toolbar { position: static; }
+  }
+  @media (max-width: 600px) {
+    .row { grid-template-columns: 1fr; }
+    .templates { grid-template-columns: 1fr; }
+    header.app, .toolbar, .layout { padding-left: 10px; padding-right: 10px; }
+    .resume { font-size: 10pt; }
+  }
+  .char-count { font-size: 12px; color: var(--muted); margin: 3px 0 0; }
+  .char-count.over { color: #a33; font-weight: 700; }
+  .editor { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+  .editor h2 { font-size: 15px; margin: 18px 0 8px; padding-top: 14px; border-top: 1px solid #e3e3e3; }
+  .editor h2:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+  label { display: block; font-size: 12px; font-weight: 600; color: #333; margin: 8px 0 3px; }
+  input[type="text"], input[type="email"], input[type="tel"], textarea {
+    width: 100%; font: inherit; font-size: 13px; padding: 7px 8px;
+    border: 1px solid #bbb; border-radius: 5px; background: #fff; }
+  textarea { min-height: 64px; resize: vertical; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .entry { border: 1px solid #ddd; border-radius: 6px; padding: 10px; margin: 8px 0; background: #fafafa; }
+  .entry .row { margin-top: 0; }
+  .small-btn { padding: 4px 9px; font-size: 12px; margin-top: 6px; }
+  .danger { border-color: #a33; color: #a33; background: #fff; }
+  .hint { font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+  /* Template picker */
+  .templates { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tpl-pick { border: 2px solid #bbb; border-radius: 6px; padding: 8px; cursor: pointer;
+    font-size: 12px; text-align: center; background: #fff; }
+  .tpl-pick input { accent-color: var(--btn); }
+  .tpl-pick.selected { border-color: var(--btn); background: #eef4fa; font-weight: 700; }
+  /* Section order list (drag-and-drop + up/down buttons) */
+  #order-list { list-style: none; margin: 0; padding: 0; }
+  #order-list li { display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    margin: 5px 0; border: 1px solid #bbb; border-radius: 6px; background: #fff; cursor: grab; }
+  #order-list li.dragging { opacity: .4; }
+  #order-list li.drag-over { border-top: 3px solid var(--btn); }
+  #order-list .grip { color: #888; font-weight: 700; }
+  #order-list .sec-name { flex: 1; }
+  #order-list .move { padding: 2px 7px; font-size: 13px; }
+  /* ---------- A4 preview (screen) ---------- */
+  .preview-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .resume { width: 210mm; min-height: 297mm; background: #fff; box-shadow: 0 2px 14px rgba(0,0,0,.28);
+    padding: 16mm 15mm; font-size: 11pt; line-height: 1.45; color: #111;
+    overflow-wrap: break-word; }
+  .resume a { color: inherit; }
+  /* Page-break rules: never strand a heading at the bottom of a page,
+     never split a single entry across pages if it can be avoided. */
+  .resume h2, .resume h3 { break-after: avoid; page-break-after: avoid; }
+  .resume section, .resume .entry-block { break-inside: avoid; page-break-inside: avoid; }
+  .resume p, .resume li { orphans: 3; widows: 3; }
+
+  /* ----- Template 1: Minimal ATS-friendly (plain, single column) -----
+     Deliberately plain for applicant tracking systems: one column, no
+     sidebar, no graphics, no tables, left-aligned, simple headings. */
+  .tpl-minimal-ats { font-family: Arial, Helvetica, sans-serif; }
+  .tpl-minimal-ats .r-name { text-align: left; font-size: 20pt; font-weight: 700; margin: 0 0 1mm; }
+  .tpl-minimal-ats .r-title { text-align: left; font-size: 11pt; color: #333; margin: 0 0 1mm; }
+  .tpl-minimal-ats .r-contact { text-align: left; font-size: 9.5pt; color: #333; margin: 0 0 4mm; }
+  .tpl-minimal-ats h2 { font-size: 11pt; font-weight: 700; text-transform: uppercase;
+    border-bottom: 1px solid #111; padding-bottom: 1mm; margin: 5mm 0 2.5mm; }
+  .tpl-minimal-ats h3 { font-size: 11pt; font-weight: 700; margin: 2.5mm 0 .5mm; }
+  .tpl-minimal-ats .r-meta { font-size: 10pt; color: #444; margin: 0 0 1mm; }
+  .tpl-minimal-ats .r-desc { margin: 1mm 0 0; font-size: 10.5pt; }
+  .tpl-minimal-ats ul { margin: 1mm 0 0 5mm; padding-left: 4mm; }
+  .tpl-minimal-ats .skill-list { font-size: 10.5pt; }
+
+  /* ----- Template 2: Modern professional (two-column, dark sidebar) ----- */
+  .tpl-modern-professional { font-family: -apple-system, "Segoe UI", Roboto, Arial, Helvetica, sans-serif;
+    padding: 0; display: flex; flex-direction: column; }
+  .tpl-modern-professional .m-head { background: #14263d; color: #fff; padding: 10mm 12mm 8mm; }
+  .tpl-modern-professional .r-name { font-size: 26pt; margin: 0; }
+  .tpl-modern-professional .r-title { font-size: 12pt; color: #bcd2e8; margin: 1mm 0 0; }
+  .tpl-modern-professional .r-contact { font-size: 9.5pt; color: #dbe7f2; margin: 2mm 0 0; }
+  .tpl-modern-professional .m-body { display: grid; grid-template-columns: 62mm 1fr; flex: 1; }
+  .tpl-modern-professional .m-side { background: #eef2f6; padding: 7mm 6mm; font-size: 10pt; }
+  .tpl-modern-professional .m-side h2 { font-size: 10pt; text-transform: uppercase; letter-spacing: 1.5px;
+    color: #14263d; border-bottom: 2px solid #14263d; padding-bottom: 1mm; margin: 0 0 3mm; }
+  .tpl-modern-professional .m-side ul { margin: 0; padding-left: 4mm; }
+  .tpl-modern-professional .m-side li { margin-bottom: 1mm; }
+  .tpl-modern-professional .m-main { padding: 7mm 8mm 7mm 7mm; }
+  .tpl-modern-professional .m-main h2 { font-size: 11.5pt; text-transform: uppercase; letter-spacing: 1px;
+    color: #14263d; border-bottom: 2px solid #14263d; padding-bottom: 1mm; margin: 5mm 0 2.5mm; }
+  .tpl-modern-professional .m-main h2:first-child { margin-top: 0; }
+  .tpl-modern-professional h3 { font-size: 11pt; margin: 2.5mm 0 .5mm; }
+  .tpl-modern-professional .r-meta { font-size: 10pt; color: #555; margin: 0 0 1mm; }
+  .tpl-modern-professional .r-desc { margin: 1mm 0 0; font-size: 10.5pt; }
+  .tpl-modern-professional ul { margin: 1mm 0 0 5mm; padding-left: 4mm; }
+
+  /* ----- Template 3: Contemporary technical (bold headings, wide spacing) ----- */
+  .tpl-contemporary-technical { font-family: Arial, Helvetica, sans-serif; padding: 18mm 16mm; }
+  .tpl-contemporary-technical .r-name { font-size: 34pt; font-weight: 800; line-height: 1.05; margin: 0; letter-spacing: -0.5px; }
+  .tpl-contemporary-technical .r-title { font-size: 13pt; font-weight: 700; margin: 3mm 0 0; }
+  .tpl-contemporary-technical .r-contact { font-size: 10pt; color: #555; margin: 3mm 0 0; }
+  .tpl-contemporary-technical h2 { font-size: 15pt; font-weight: 800; text-transform: uppercase;
+    margin: 9mm 0 3mm; padding-top: 3mm; border-top: 3px solid #111; }
+  .tpl-contemporary-technical h3 { font-size: 12pt; font-weight: 800; margin: 4mm 0 .5mm; }
+  .tpl-contemporary-technical .r-meta { font-size: 10.5pt; color: #555; margin: 0 0 1mm; }
+  .tpl-contemporary-technical .r-desc { margin: 1mm 0 0; font-size: 11pt; }
+  .tpl-contemporary-technical ul { margin: 1mm 0 0 5mm; padding-left: 4mm; }
+  .tpl-contemporary-technical .skill-list { font-size: 11pt; }
+
+  /* ---------- Print: only the resume, on A4, text stays selectable ---------- */
+  @page { size: A4; margin: 0; }
+  @media print {
+    body { background: #fff; }
+    header.app, .toolbar, .editor, .preview-wrap > p, .no-print { display: none !important; }
+    .layout { display: block; padding: 0; }
+    .preview-wrap { display: block; }
+    .resume { width: 210mm; min-height: 297mm; box-shadow: none; margin: 0;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .tpl-modern-professional .m-head, .tpl-modern-professional .m-side {
+      -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    /* Print: a grid sidebar does not fragment cleanly across pages in
+       several print engines, so use a floated sidebar for printing.
+       The sidebar prints on page 1; the main column flows on. */
+    .tpl-modern-professional .m-body { display: block; }
+    .tpl-modern-professional .m-side { float: left; width: 62mm; min-height: 240mm; }
+    .tpl-modern-professional .m-main { margin-left: 62mm; padding-left: 7mm; }
+  }
+</style>
+</head>
+<body>
+<header class="app">
+  <h1>Resume Builder</h1>
+  <p>Fill in the form — the A4 preview updates live. Everything stays on your device. No account, no upload, no internet needed.</p>
+</header>
+
+<div class="toolbar no-print">
+  <button id="btn-sample" class="secondary" type="button">Reset to sample</button>
+  <button id="btn-clear" class="secondary" type="button">Clear all</button>
+  <button id="btn-preview" class="secondary" type="button">Preview mode</button>
+  <button id="btn-save" type="button">Save as .json</button>
+  <label class="file-label" for="file-load">Load .json…</label>
+  <input type="file" id="file-load" accept=".json,application/json" hidden>
+  <button id="btn-print" type="button">Export PDF (Print)</button>
+  <span class="page-count" id="page-count"></span>
+</div>
+
+<div class="layout">
+  <!-- ================= Editor ================= -->
+  <div class="editor no-print" id="editor">
+    <h2>Template</h2>
+    <div class="templates" id="templates">
+      <label class="tpl-pick selected"><input type="radio" name="template" value="modern-professional" checked> Modern professional<br><span>Sidebar, two-column</span></label>
+      <label class="tpl-pick"><input type="radio" name="template" value="minimal-ats"> Minimal ATS-friendly<br><span>Plain, single column</span></label>
+      <label class="tpl-pick"><input type="radio" name="template" value="contemporary-technical"> Contemporary technical<br><span>Bold headings</span></label>
+    </div>
+
+    <h2>Section order</h2>
+    <p class="hint">Drag a section by its handle (⋮⋮) to reorder it, or use the ↑ ↓ buttons. In the Modern professional template, Skills always sits in the sidebar; the other sections follow this order.</p>
+    <ul id="order-list"></ul>
+
+    <h2>Personal details</h2>
+    <label for="f-name">Full name</label>
+    <input type="text" id="f-name" data-field="personal.name" autocomplete="off">
+    <label for="f-title">Job title / headline</label>
+    <input type="text" id="f-title" data-field="personal.title" autocomplete="off">
+    <div class="row">
+      <div><label for="f-email">Email</label>
+        <input type="email" id="f-email" data-field="personal.email" autocomplete="off"></div>
+      <div><label for="f-phone">Phone</label>
+        <input type="tel" id="f-phone" data-field="personal.phone" autocomplete="off"></div>
+    </div>
+    <div class="row">
+      <div><label for="f-location">Location</label>
+        <input type="text" id="f-location" data-field="personal.location" autocomplete="off"></div>
+      <div><label for="f-link">Website / LinkedIn</label>
+        <input type="text" id="f-link" data-field="personal.link" autocomplete="off"></div>
+    </div>
+
+    <h2>Summary</h2>
+    <label for="f-summary">Professional summary</label>
+    <textarea id="f-summary" data-field="summary"></textarea>
+    <p class="char-count" id="summary-count">0 / 600 characters</p>
+
+    <h2>Experience</h2>
+    <div id="exp-form"></div>
+    <button id="btn-add-exp" class="secondary small-btn" type="button">+ Add experience</button>
+
+    <h2>Internships</h2>
+    <div id="intern-form"></div>
+    <button id="btn-add-intern" class="secondary small-btn" type="button">+ Add internship</button>
+
+    <h2>Education</h2>
+    <div id="edu-form"></div>
+    <button id="btn-add-edu" class="secondary small-btn" type="button">+ Add education</button>
+
+    <h2>Skills</h2>
+    <label for="f-skills">Skills (comma-separated)</label>
+    <textarea id="f-skills" data-field="skills"></textarea>
+
+    <h2>Projects</h2>
+    <div id="proj-form"></div>
+    <button id="btn-add-proj" class="secondary small-btn" type="button">+ Add project</button>
+
+    <h2>Certifications</h2>
+    <div id="cert-form"></div>
+    <button id="btn-add-cert" class="secondary small-btn" type="button">+ Add certification</button>
+
+    <h2>Achievements</h2>
+    <div id="ach-form"></div>
+    <button id="btn-add-ach" class="secondary small-btn" type="button">+ Add achievement</button>
+
+    <h2>Positions of Responsibility</h2>
+    <div id="pos-form"></div>
+    <button id="btn-add-pos" class="secondary small-btn" type="button">+ Add position</button>
+    <p class="hint">Sample data only — "Riya Sharma" is a fake person from the Week 2 PDF preview. Replace it with your own details before using this resume for real.</p>
+  </div>
+
+  <!-- ================= A4 preview ================= -->
+  <div class="preview-wrap">
+    <p class="hint no-print">Live A4 preview — this is exactly what the PDF export will contain.</p>
+    <div class="resume tpl-modern-professional" id="resume" aria-label="Resume preview"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ---------- Sample data (fake person, from the Week 2 PDF preview) ---------- */
+var SAMPLE = {
+  personal: { name: "Riya Sharma", title: "Aspiring Data Analyst",
+    email: "riya@example.com", phone: "+91 98765 43210",
+    location: "Pune, Maharashtra, India", link: "linkedin.com/in/riyasharma" },
+  summary: "Final-year B.Tech student in Computer Science with a strong foundation in Python, SQL and data visualisation. Built dashboards and analysis projects on real-world-style datasets, and completed a data-analytics internship where I cleaned messy data, built reports and presented findings to non-technical stakeholders. Looking for a data analyst internship where I can turn data into clear, useful decisions.",
+  experience: [
+    { role: "Data Analytics Intern", company: "Nova Labs, Pune", dates: "Jun 2026 – Aug 2026",
+      desc: "Cleaned and analysed sales data for 12,000+ orders in Python and Excel; built a weekly dashboard that cut manual reporting time by about half; presented findings to the operations team." },
+    { role: "Teaching Assistant — DBMS Lab", company: "Pimpri Chinchwad University, Pune", dates: "Jan 2026 – May 2026",
+      desc: "Helped 60 first-year students with SQL queries and ER diagrams; ran two revision sessions before the mid-semester exam; marked lab assignments against a shared rubric." },
+    { role: "Freelance Data Entry & Reporting", company: "Local retail shop, Pune", dates: "Oct 2025 – Dec 2025",
+      desc: "Digitised paper billing records into spreadsheets; produced a monthly summary of best-selling items; flagged stock items that had not sold in 90 days." },
+    { role: "Volunteer — College Tech Fest", company: "Developers Club, PCU", dates: "Sep 2025",
+      desc: "Managed registrations for 200+ participants; coordinated the judging schedule for a 24-hour hackathon; wrote the post-event summary report." }
+  ],
+  education: [
+    { degree: "B.Tech, Computer Science and Engineering", school: "Pimpri Chinchwad University, Pune", dates: "2024 – 2028", desc: "CGPA 8.9 (up to 4th semester). Relevant coursework: DBMS, Data Structures, Statistics, Machine Learning." },
+    { degree: "Higher Secondary (Science)", school: "Kendriya Vidyalaya, Pune", dates: "2022 – 2024", desc: "Percentage: 91%. Subjects: Physics, Chemistry, Mathematics, Computer Science." },
+    { degree: "Secondary School (Class X)", school: "Kendriya Vidyalaya, Pune", dates: "2022", desc: "Percentage: 93%. School topper in Mathematics." }
+  ],
+  skills: "Python, SQL, Excel, Power BI, Pandas, NumPy, Matplotlib, Data Cleaning, Data Visualisation, Git, GitHub, Communication, Problem Solving",
+  projects: [
+    { name: "Sales Data Exploratory Analysis", desc: "Analysed 12,000+ orders to find top products, seasonal trends and slow-moving stock; built charts and a written summary of recommendations.", link: "github.com/riya-sharma/sales-analysis" },
+    { name: "PDF Studio — Document Helper", desc: "A small offline tool that merges and splits PDF pages in the browser; built with HTML, CSS and JavaScript; no file is uploaded anywhere.", link: "github.com/riya-sharma/pdf-studio" },
+    { name: "Student Attendance Dashboard", desc: "Power BI dashboard showing attendance by class and subject, with filters for month and teacher; used by two class coordinators.", link: "" },
+    { name: "Climate Data Mini Project", desc: "Cleaned a public weather dataset, plotted temperature trends over ten years and wrote a two-page report on the findings.", link: "" }
+  ],
+  internships: [
+    { role: "Content & Data Intern", company: "LearnSphere, Pune", dates: "Jan 2026 – Mar 2026",
+      desc: "Prepared practice datasets and answer keys for a data-analysis course; checked 200+ quiz questions for errors; wrote short explainers on SQL joins and window functions." }
+  ],
+  certifications: [
+    { title: "Google Data Analytics Professional Certificate", issuer: "Google / Coursera", year: "2026", detail: "Eight-course series: data cleaning, analysis, visualisation and R." },
+    { title: "SQL for Data Science", issuer: "Coursera", year: "2025", detail: "Joins, subqueries, window functions and query optimisation." }
+  ],
+  achievements: [
+    { title: "Hackathon finalist — Smart India Hackathon (college round)", year: "2025",
+      detail: "Built a dashboard prototype for campus energy use; one of 6 teams shortlisted from 40." },
+    { title: "Best Poster — Department Research Day", year: "2026",
+      detail: "Poster on visualising attendance data won the undergraduate category." }
+  ],
+  positions: [
+    { title: "Technical Lead", org: "Developers Club, Pimpri Chinchwad University", year: "2025 – 2026",
+      detail: "Lead a 12-member team; organised two workshops on Python and SQL for 80+ students." }
+  ]
+};
+var SECTION_LABELS = { summary: "Summary", experience: "Experience", internships: "Internships",
+  education: "Education", skills: "Skills", projects: "Projects",
+  certifications: "Certifications", achievements: "Achievements", positions: "Positions of Responsibility" };
+var DEFAULT_ORDER = ["summary", "experience", "internships", "education", "skills",
+  "projects", "certifications", "achievements", "positions"];
+
+var state = {
+  template: "modern-professional",
+  order: DEFAULT_ORDER.slice(),
+  data: JSON.parse(JSON.stringify(SAMPLE))
+};
+
+/* ---------- Helpers ---------- */
+function $(id) { return document.getElementById(id); }
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+function lines(text) {
+  return esc(text).split(/\n+/).filter(function (t) { return t.trim() !== ""; });
+}
+function getField(path) {
+  var parts = path.split("."), obj = state.data;
+  for (var i = 0; i < parts.length; i++) obj = obj[parts[i]];
+  return obj == null ? "" : obj;
+}
+function setField(path, value) {
+  var parts = path.split("."), obj = state.data;
+  for (var i = 0; i < parts.length - 1; i++) obj = obj[parts[i]];
+  obj[parts[parts.length - 1]] = value;
+}
+
+/* ---------- Preview rendering ---------- */
+function sectionHtml(key) {
+  var d = state.data, html = "";
+  if (key === "summary") {
+    if (!d.summary.trim()) return "";
+    html = '<section><h2>Summary</h2>' + lines(d.summary).map(function (p) {
+      return "<p>" + p + "</p>";
+    }).join("") + "</section>";
+  } else if (key === "experience") {
+    if (!d.experience.length) return "";
+    html = "<section><h2>Experience</h2>" + d.experience.map(function (e) {
+      return '<div class="entry-block"><h3>' + esc(e.role) + "</h3>" +
+        '<p class="r-meta">' + esc(e.company) + (e.dates ? " &middot; " + esc(e.dates) : "") + "</p>" +
+        (e.desc ? "<p class=\"r-desc\">" + esc(e.desc) + "</p>" : "") + "</div>";
+    }).join("") + "</section>";
+  } else if (key === "education") {
+    if (!d.education.length) return "";
+    html = "<section><h2>Education</h2>" + d.education.map(function (e) {
+      return '<div class="entry-block"><h3>' + esc(e.degree) + "</h3>" +
+        '<p class="r-meta">' + esc(e.school) + (e.dates ? " &middot; " + esc(e.dates) : "") + "</p>" +
+        (e.desc ? "<p class=\"r-desc\">" + esc(e.desc) + "</p>" : "") + "</div>";
+    }).join("") + "</section>";
+  } else if (key === "skills") {
+    var skills = d.skills.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+    if (!skills.length) return "";
+    html = '<section><h2>Skills</h2><ul>' + skills.map(function (s) {
+      return "<li>" + esc(s) + "</li>";
+    }).join("") + "</ul></section>";
+  } else if (key === "projects") {
+    if (!d.projects.length) return "";
+    html = "<section><h2>Projects</h2>" + d.projects.map(function (p) {
+      return '<div class="entry-block"><h3>' + esc(p.name) + "</h3>" +
+        (p.desc ? "<p class=\"r-desc\">" + esc(p.desc) + "</p>" : "") +
+        (p.link ? "<p class=\"r-meta\">" + esc(p.link) + "</p>" : "") + "</div>";
+    }).join("") + "</section>";
+  } else if (key === "internships") {
+    if (!d.internships || !d.internships.length) return "";
+    html = "<section><h2>Internships</h2>" + d.internships.map(function (e) {
+      return '<div class="entry-block"><h3>' + esc(e.role) + "</h3>" +
+        '<p class="r-meta">' + esc(e.company) + (e.dates ? " &middot; " + esc(e.dates) : "") + "</p>" +
+        (e.desc ? "<p class=\"r-desc\">" + esc(e.desc) + "</p>" : "") + "</div>";
+    }).join("") + "</section>";
+  } else if (key === "certifications") {
+    if (!d.certifications || !d.certifications.length) return "";
+    html = "<section><h2>Certifications</h2>" + d.certifications.map(function (c) {
+      return '<div class="entry-block"><h3>' + esc(c.title) + "</h3>" +
+        '<p class="r-meta">' + esc(c.issuer) + (c.year ? " &middot; " + esc(c.year) : "") + "</p>" +
+        (c.detail ? "<p class=\"r-desc\">" + esc(c.detail) + "</p>" : "") + "</div>";
+    }).join("") + "</section>";
+  } else if (key === "achievements") {
+    if (!d.achievements || !d.achievements.length) return "";
+    html = "<section><h2>Achievements</h2>" + d.achievements.map(function (a) {
+      return '<div class="entry-block"><h3>' + esc(a.title) + "</h3>" +
+        (a.year ? '<p class="r-meta">' + esc(a.year) + "</p>" : "") +
+        (a.detail ? "<p class=\"r-desc\">" + esc(a.detail) + "</p>" : "") + "</div>";
+    }).join("") + "</section>";
+  } else if (key === "positions") {
+    if (!d.positions || !d.positions.length) return "";
+    html = "<section><h2>Positions of Responsibility</h2>" + d.positions.map(function (p) {
+      return '<div class="entry-block"><h3>' + esc(p.title) + "</h3>" +
+        '<p class="r-meta">' + esc(p.org) + (p.year ? " &middot; " + esc(p.year) : "") + "</p>" +
+        (p.detail ? "<p class=\"r-desc\">" + esc(p.detail) + "</p>" : "") + "</div>";
+    }).join("") + "</section>";
+  }
+  return html;
+}
+function renderPreview() {
+  var d = state.data, r = $("resume");
+  r.className = "resume tpl-" + state.template;
+  var contact = [d.personal.email, d.personal.phone, d.personal.location, d.personal.link]
+    .filter(function (x) { return x && x.trim(); }).map(esc).join(" &middot; ");
+  var head = '<div class="r-name">' + esc(d.personal.name || "Your Name") + "</div>" +
+    (d.personal.title ? '<div class="r-title">' + esc(d.personal.title) + "</div>" : "") +
+    (contact ? '<div class="r-contact">' + contact + "</div>" : "");
+  if (state.template === "modern-professional") {
+    /* Sidebar holds Contact + Skills by design; other sections follow the
+       dragged order in the main column. */
+    var main = state.order.filter(function (k) { return k !== "skills"; })
+      .map(sectionHtml).join("");
+    var sideSkills = sectionHtml("skills");
+    r.innerHTML = '<div class="m-head">' + head + "</div>" +
+      '<div class="m-body"><aside class="m-side">' +
+      (sideSkills || "<h2>Skills</h2><p>Add skills in the form.</p>") +
+      "</aside><main class=\"m-main\">" + main + "</main></div>";
+  } else {
+    r.innerHTML = head + state.order.map(sectionHtml).join("");
+  }
+  updatePageCount();
+}
+/* Summary character counter: 600 characters is the recommended length
+   for a resume summary. The field allows up to 1200; past 600 the
+   counter turns red as a warning, it does not block typing. */
+var SUMMARY_LIMIT = 600;
+function updateSummaryCounter() {
+  var el = $("summary-count");
+  if (!el) return;
+  var n = (state.data.summary || "").length;
+  el.textContent = n + " / " + SUMMARY_LIMIT + " characters" +
+    (n > SUMMARY_LIMIT ? " — over the recommended length, shorten it" : "");
+  el.classList.toggle("over", n > SUMMARY_LIMIT);
+}
+function updatePageCount() {
+  /* A4 height at 96 dpi is ~1122 px; the preview uses mm sizing, so this
+     is an estimate shown on screen only — the printed page count is what
+     the browser's print preview shows. */
+  var h = $("resume").offsetHeight || 0;
+  var pages = Math.max(1, Math.ceil(h / 1122));
+  $("page-count").textContent = "Preview ≈ " + pages + " A4 page" + (pages === 1 ? "" : "s") +
+    " (check the print preview for the exact count)";
+}
+
+/* ---------- Editor forms ---------- */
+function bindSimpleFields() {
+  document.querySelectorAll("[data-field]").forEach(function (el) {
+    el.value = getField(el.getAttribute("data-field"));
+    el.oninput = function () {
+      setField(el.getAttribute("data-field"), el.value);
+      if (el.getAttribute("data-field") === "summary") updateSummaryCounter();
+      renderPreview(); autosave();
+    };
+  });
+  updateSummaryCounter();
+}
+function entryForm(list, index, fields, onRemove) {
+  var item = list[index], wrap = document.createElement("div");
+  wrap.className = "entry";
+  fields.forEach(function (f) {
+    var label = document.createElement("label");
+    label.textContent = f.label;
+    var input = f.textarea ? document.createElement("textarea") : document.createElement("input");
+    if (!f.textarea) input.type = "text";
+    input.value = item[f.key] || "";
+    input.oninput = function () { item[f.key] = input.value; renderPreview(); autosave(); };
+    wrap.appendChild(label); wrap.appendChild(input);
+  });
+  var del = document.createElement("button");
+  del.type = "button"; del.className = "secondary small-btn danger"; del.textContent = "Remove";
+  del.onclick = function () { onRemove(index); };
+  wrap.appendChild(del);
+  return wrap;
+}
+/* Repeatable entry lists (experience, internships, education, projects,
+   certifications, achievements, positions). One generic renderer so a
+   new section is one config row, not a copy of the same code. */
+var REPEAT_SECTIONS = [
+  { id: "exp-form", key: "experience", fields: [
+    { key: "role", label: "Role / job title" }, { key: "company", label: "Company" },
+    { key: "dates", label: "Dates (e.g. Jun 2026 – Aug 2026)" },
+    { key: "desc", label: "Description", textarea: true } ] },
+  { id: "intern-form", key: "internships", fields: [
+    { key: "role", label: "Role / internship title" }, { key: "company", label: "Organisation" },
+    { key: "dates", label: "Dates (e.g. Jan 2026 – Mar 2026)" },
+    { key: "desc", label: "Description", textarea: true } ] },
+  { id: "edu-form", key: "education", fields: [
+    { key: "degree", label: "Degree / qualification" }, { key: "school", label: "School / university" },
+    { key: "dates", label: "Dates" }, { key: "desc", label: "Details", textarea: true } ] },
+  { id: "proj-form", key: "projects", fields: [
+    { key: "name", label: "Project name" }, { key: "desc", label: "Description", textarea: true },
+    { key: "link", label: "Link (optional)" } ] },
+  { id: "cert-form", key: "certifications", fields: [
+    { key: "title", label: "Certification / course" }, { key: "issuer", label: "Issuer" },
+    { key: "year", label: "Year" }, { key: "detail", label: "Details", textarea: true } ] },
+  { id: "ach-form", key: "achievements", fields: [
+    { key: "title", label: "Achievement" }, { key: "year", label: "Year" },
+    { key: "detail", label: "Details", textarea: true } ] },
+  { id: "pos-form", key: "positions", fields: [
+    { key: "title", label: "Position" }, { key: "org", label: "Organisation" },
+    { key: "year", label: "Year / tenure" }, { key: "detail", label: "Details", textarea: true } ] }
+];
+function renderRepeatForms() {
+  REPEAT_SECTIONS.forEach(function (cfg) {
+    var container = $(cfg.id);
+    if (!container) return;
+    container.innerHTML = "";
+    var list = state.data[cfg.key] || (state.data[cfg.key] = []);
+    list.forEach(function (_, i) {
+      container.appendChild(entryForm(list, i, cfg.fields, function (idx) {
+        list.splice(idx, 1); renderRepeatForms(); renderPreview(); autosave();
+      }));
+    });
+  });
+}
+
+/* ---------- Section order (drag-and-drop + up/down buttons) ---------- */
+function renderOrderList() {
+  var ul = $("order-list"); ul.innerHTML = "";
+  state.order.forEach(function (key, i) {
+    var li = document.createElement("li");
+    li.draggable = true; li.dataset.key = key;
+    var grip = document.createElement("span"); grip.className = "grip"; grip.textContent = "⋮⋮";
+    var name = document.createElement("span"); name.className = "sec-name"; name.textContent = SECTION_LABELS[key];
+    var up = document.createElement("button"); up.type = "button"; up.className = "secondary move";
+    up.textContent = "↑"; up.title = "Move up"; up.disabled = i === 0;
+    up.onclick = function () { moveSection(i, i - 1); };
+    var down = document.createElement("button"); down.type = "button"; down.className = "secondary move";
+    down.textContent = "↓"; down.title = "Move down"; down.disabled = i === state.order.length - 1;
+    down.onclick = function () { moveSection(i, i + 1); };
+    li.appendChild(grip); li.appendChild(name); li.appendChild(up); li.appendChild(down);
+    li.addEventListener("dragstart", function (e) {
+      e.dataTransfer.setData("text/plain", key); li.classList.add("dragging");
+    });
+    li.addEventListener("dragend", function () { li.classList.remove("dragging"); });
+    li.addEventListener("dragover", function (e) { e.preventDefault(); li.classList.add("drag-over"); });
+    li.addEventListener("dragleave", function () { li.classList.remove("drag-over"); });
+    li.addEventListener("drop", function (e) {
+      e.preventDefault(); li.classList.remove("drag-over");
+      var dragged = e.dataTransfer.getData("text/plain");
+      var from = state.order.indexOf(dragged), to = state.order.indexOf(key);
+      if (from > -1 && to > -1 && from !== to) moveSection(from, to);
+    });
+    ul.appendChild(li);
+  });
+}
+function moveSection(from, to) {
+  var item = state.order.splice(from, 1)[0];
+  state.order.splice(to, 0, item);
+  renderOrderList(); renderPreview(); autosave();
+}
+
+/* ---------- Save / load ---------- */
+function collectState() {
+  return { version: 1, app: "resume-builder", template: state.template,
+    order: state.order.slice(),
+    data: JSON.parse(JSON.stringify(state.data)) };
+}
+function applyState(saved) {
+  if (!saved || typeof saved !== "object" || !saved.data) throw new Error("Not a resume file.");
+  /* Template names from the detailed brief; old files saved with the
+     previous names (classic / modern / minimal) still load. */
+  var LEGACY_TEMPLATES = { classic: "minimal-ats", modern: "modern-professional", minimal: "contemporary-technical" };
+  var tpl = saved.template && LEGACY_TEMPLATES[saved.template] ? LEGACY_TEMPLATES[saved.template] : saved.template;
+  state.template = ["modern-professional", "minimal-ats", "contemporary-technical"].indexOf(tpl) > -1
+    ? tpl : "modern-professional";
+  state.order = Array.isArray(saved.order) && saved.order.length
+    ? saved.order.filter(function (k) { return SECTION_LABELS[k]; }) : DEFAULT_ORDER.slice();
+  DEFAULT_ORDER.forEach(function (k) { if (state.order.indexOf(k) === -1) state.order.push(k); });
+  var d = saved.data;
+  state.data = {
+    personal: Object.assign({ name: "", title: "", email: "", phone: "", location: "", link: "" }, d.personal || {}),
+    summary: d.summary || "",
+    experience: Array.isArray(d.experience) ? d.experience : [],
+    internships: Array.isArray(d.internships) ? d.internships : [],
+    education: Array.isArray(d.education) ? d.education : [],
+    skills: d.skills || "",
+    projects: Array.isArray(d.projects) ? d.projects : [],
+    certifications: Array.isArray(d.certifications) ? d.certifications : [],
+    achievements: Array.isArray(d.achievements) ? d.achievements : [],
+    positions: Array.isArray(d.positions) ? d.positions : []
+  };
+  syncEditor();
+}
+function syncEditor() {
+  document.querySelectorAll('input[name="template"]').forEach(function (r) {
+    r.checked = r.value === state.template;
+    r.closest(".tpl-pick").classList.toggle("selected", r.checked);
+  });
+  bindSimpleFields(); renderRepeatForms(); renderOrderList(); renderPreview();
+}
+function downloadJson() {
+  var name = (state.data.personal.name || "resume").trim().toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "resume";
+  var blob = new Blob([JSON.stringify(collectState(), null, 2)], { type: "application/json" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name + "-resume.json";
+  document.body.appendChild(a); a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+var saveTimer = null;
+function autosave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function () {
+    try { localStorage.setItem("resume-builder-v1", JSON.stringify(collectState())); } catch (e) { /* private mode */ }
+  }, 300);
+}
+
+/* ---------- Wire up ---------- */
+document.querySelectorAll('input[name="template"]').forEach(function (r) {
+  r.onchange = function () {
+    state.template = r.value;
+    document.querySelectorAll(".tpl-pick").forEach(function (p) {
+      p.classList.toggle("selected", p.contains(document.querySelector('input[name="template"]:checked')));
+    });
+    renderPreview(); autosave();
+  };
+});
+$("btn-add-exp").onclick = function () {
+  state.data.experience.push({ role: "", company: "", dates: "", desc: "" });
+  renderRepeatForms(); renderPreview(); autosave();
+};
+$("btn-add-intern").onclick = function () {
+  state.data.internships.push({ role: "", company: "", dates: "", desc: "" });
+  renderRepeatForms(); renderPreview(); autosave();
+};
+$("btn-add-edu").onclick = function () {
+  state.data.education.push({ degree: "", school: "", dates: "", desc: "" });
+  renderRepeatForms(); renderPreview(); autosave();
+};
+$("btn-add-proj").onclick = function () {
+  state.data.projects.push({ name: "", desc: "", link: "" });
+  renderRepeatForms(); renderPreview(); autosave();
+};
+$("btn-add-cert").onclick = function () {
+  state.data.certifications.push({ title: "", issuer: "", year: "", detail: "" });
+  renderRepeatForms(); renderPreview(); autosave();
+};
+$("btn-add-ach").onclick = function () {
+  state.data.achievements.push({ title: "", year: "", detail: "" });
+  renderRepeatForms(); renderPreview(); autosave();
+};
+$("btn-add-pos").onclick = function () {
+  state.data.positions.push({ title: "", org: "", year: "", detail: "" });
+  renderRepeatForms(); renderPreview(); autosave();
+};
+$("btn-save").onclick = downloadJson;
+$("btn-print").onclick = function () { window.print(); };
+$("file-load").onchange = function (e) {
+  var file = e.target.files && e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function () {
+    try { applyState(JSON.parse(reader.result)); autosave(); alert("Resume loaded from " + file.name + "."); }
+    catch (err) { alert("Could not load that file: " + err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+};
+$("btn-sample").onclick = function () {
+  if (!confirm("Reset to the sample resume? Your current edits will be replaced. (Save as .json first if you want to keep them.)")) return;
+  state.data = JSON.parse(JSON.stringify(SAMPLE));
+  state.order = DEFAULT_ORDER.slice(); state.template = "modern-professional";
+  syncEditor(); autosave();
+};
+$("btn-clear").onclick = function () {
+  if (!confirm("Clear every field? (Use Save as .json first if you want to keep this resume.)")) return;
+  state.data = { personal: { name: "", title: "", email: "", phone: "", location: "", link: "" },
+    summary: "", experience: [], internships: [], education: [], skills: "", projects: [],
+    certifications: [], achievements: [], positions: [] };
+  state.order = DEFAULT_ORDER.slice();
+  syncEditor(); autosave();
+};
+/* Preview mode: hide the editor, show only the A4 preview. The button
+   becomes "Exit preview"; Esc also exits. Print is unaffected. */
+$("btn-preview").onclick = function () {
+  var on = document.body.classList.toggle("preview-mode");
+  $("btn-preview").textContent = on ? "Exit preview" : "Preview mode";
+  updatePageCount();
+  if (on) window.scrollTo(0, 0);
+};
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape" && document.body.classList.contains("preview-mode")) {
+    document.body.classList.remove("preview-mode");
+    $("btn-preview").textContent = "Preview mode";
+    updatePageCount();
+  }
+});
+window.addEventListener("resize", updatePageCount);
+
+/* ---------- Start: restore autosaved work if present, else the sample ---------- */
+(function init() {
+  try {
+    var saved = localStorage.getItem("resume-builder-v1");
+    if (saved) { applyState(JSON.parse(saved)); return; }
+  } catch (e) { /* corrupted autosave: fall through to the sample */ }
+  syncEditor();
+})();
+</script>
+</body>
+</html>

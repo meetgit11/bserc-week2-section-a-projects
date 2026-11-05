@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Form Photo Fixer — BSERC Week 2, Section A</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; background: #f4f6f8; color: #1c2430; line-height: 1.5; }
+  header { background: #123a5c; color: #fff; padding: 20px 24px; }
+  header h1 { margin: 0 0 4px; font-size: 1.5rem; }
+  header p { margin: 0; opacity: .9; }
+  main { max-width: 920px; margin: 0 auto; padding: 20px 16px 48px; }
+  section { background: #fff; border: 1px solid #dbe2ea; border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  h2 { margin: 0 0 10px; font-size: 1.15rem; }
+  h3 { margin: 14px 0 6px; font-size: 1rem; }
+  .note { background: #eef6ee; border: 1px solid #bcd8bc; border-radius: 8px; padding: 10px 12px; font-size: .92rem; }
+  .warn { background: #fff4e0; border: 1px solid #e8c87a; border-radius: 8px; padding: 10px 12px; font-size: .92rem; }
+  .presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+  .preset { border: 2px solid #dbe2ea; border-radius: 10px; padding: 12px; cursor: pointer; background: #fff; }
+  .preset:hover { border-color: #7aa8c9; }
+  .preset.selected { border-color: #123a5c; background: #eaf2f8; }
+  .preset b { display: block; margin-bottom: 4px; }
+  .preset small { color: #4a5a6a; }
+  .preset .spec { font-size: .85rem; margin-top: 6px; color: #1c2430; }
+  label { display: block; font-size: .9rem; margin: 8px 0 2px; }
+  input[type="number"], input[type="text"], select { width: 100%; padding: 8px; border: 1px solid #b9c4d0; border-radius: 8px; font-size: 1rem; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  button { background: #123a5c; color: #fff; border: none; border-radius: 8px; padding: 10px 16px; font-size: 1rem; cursor: pointer; margin: 6px 6px 0 0; }
+  button.secondary { background: #e8edf2; color: #1c2430; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  input[type="file"] { margin: 6px 0; }
+  /* Cropper */
+  .crop-stage { position: relative; width: 100%; height: 340px; background: #222; border-radius: 10px; overflow: hidden; touch-action: none; user-select: none; }
+  .crop-stage img { position: absolute; top: 0; left: 0; max-width: none; cursor: grab; will-change: transform; }
+  .crop-stage img:active { cursor: grabbing; }
+  .crop-window { position: absolute; border: 2px solid #fff; box-shadow: 0 0 0 9999px rgba(0,0,0,.55); pointer-events: none; }
+  .crop-window .face-guide { position: absolute; inset: 12% 20% 8% 20%; border: 2px dashed #ffd54a; border-radius: 50%; }
+  .crop-window .face-label { position: absolute; top: -22px; left: 0; color: #ffd54a; font-size: .8rem; font-weight: 600; text-shadow: 0 1px 2px #000; }
+  .crop-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #cfd8e0; text-align: center; padding: 20px; }
+  .slider-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .slider-row input[type="range"] { flex: 1; }
+  .result { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; margin-top: 12px; }
+  .result img { border: 1px solid #b9c4d0; background: #fff; max-width: 100%; }
+  .result .meta { font-size: .95rem; }
+  .ok { color: #1d7a2e; font-weight: 700; }
+  .bad { color: #b3261e; font-weight: 700; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .8rem; background: #e8edf2; margin-right: 4px; }
+  .error-box { display: none; background: #fdecea; border: 1px solid #e5a09a; color: #7a1f18; border-radius: 8px; padding: 10px 12px; font-size: .92rem; margin: 8px 0; }
+  .orig-info { font-size: .9rem; color: #33475c; background: #eef3f8; border: 1px solid #d3deea; border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
+  .orig-info:empty { display: none; }
+  .progress { display: none; font-size: .9rem; color: #123a5c; margin: 8px 0; }
+  .compare { margin: 0; }
+  .compare figcaption { font-size: .85rem; color: #33475c; margin-top: 4px; max-width: 240px; }
+  .compare figcaption b { color: #1c2430; }
+  .preset { position: relative; }
+  .preset .del { position: absolute; top: 6px; right: 6px; background: #fdecea; color: #7a1f18; border: 1px solid #e5a09a; border-radius: 6px; padding: 2px 8px; font-size: .8rem; cursor: pointer; margin: 0; }
+  /* Toasts */
+  .toast-wrap { position: fixed; right: 16px; bottom: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; max-width: min(360px, 90vw); }
+  .toast { background: #1c2430; color: #fff; border-radius: 8px; padding: 10px 14px; font-size: .92rem; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+  .toast.success { background: #1d7a2e; }
+  .toast.error { background: #b3261e; }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; font-weight: 600; }
+  footer { font-size: .85rem; color: #4a5a6a; }
+  a { color: #123a5c; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Form Photo Fixer</h1>
+  <p>Get a photo and signature ready for exam and job application forms — in one step, on your own laptop.</p>
+</header>
+<main>
+
+  <section>
+    <div class="note"><strong>Private by design:</strong> every file you open stays in this browser tab. Nothing is uploaded, no account, no internet needed. Test with a sample photo first — never use a real document to try the tool.</div>
+  </section>
+
+  <!-- STEP 1: PRESET -->
+  <section>
+    <h2>1 · Choose the form</h2>
+    <div class="presets" id="presetList"></div>
+    <p id="presetSource" style="font-size:.9rem;color:#4a5a6a;"></p>
+    <details>
+      <summary>Add your own custom preset</summary>
+      <div class="row">
+        <div><label>Preset name</label><input type="text" id="customName" value="My form"></div>
+        <div><label>Photo width (px)</label><input type="number" id="customPhotoW" value="350" min="50"></div>
+        <div><label>Photo height (px)</label><input type="number" id="customPhotoH" value="450" min="50"></div>
+        <div><label>Photo min KB</label><input type="number" id="customPhotoMin" value="10" min="1"></div>
+        <div><label>Photo max KB</label><input type="number" id="customPhotoMax" value="50" min="1"></div>
+      </div>
+      <div class="row">
+        <div><label>Signature width (px, 0 = none)</label><input type="number" id="customSigW" value="350" min="0"></div>
+        <div><label>Signature height (px)</label><input type="number" id="customSigH" value="150" min="0"></div>
+        <div><label>Signature min KB</label><input type="number" id="customSigMin" value="4" min="0"></div>
+        <div><label>Signature max KB</label><input type="number" id="customSigMax" value="30" min="0"></div>
+      </div>
+      <button type="button" id="addCustomBtn">Add custom preset</button>
+    </details>
+  </section>
+
+  <!-- STEP 2: PHOTO -->
+  <section>
+    <h2>2 · Photo — upload, crop, compress</h2>
+    <input type="file" id="photoInput" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+    <button type="button" class="secondary" id="samplePhotoBtn">Load a sample photo instead</button>
+    <button type="button" class="secondary" id="resetPhotoBtn">Reset crop</button>
+    <div class="error-box" id="photoError" role="alert"></div>
+    <div class="orig-info" id="photoOrigInfo"></div>
+    <div class="crop-stage" id="photoStage">
+      <div class="crop-empty" id="photoEmpty">Upload a photo (or load the sample) to start cropping.<br>Drag the photo to move it under the frame. The dashed oval is the face guide — put the face inside it.</div>
+      <img id="photoImg" alt="" draggable="false" style="display:none">
+      <div class="crop-window" id="photoWindow" style="display:none"><div class="face-guide"></div><div class="face-label">Face inside this oval</div></div>
+    </div>
+    <div class="slider-row"><label for="photoZoom" style="white-space:nowrap">Zoom</label><input type="range" id="photoZoom" min="1" max="4" step="0.01" value="1"><span id="photoZoomVal">1.00×</span></div>
+    <div class="slider-row"><label for="photoCropSize" style="white-space:nowrap">Crop size</label><input type="range" id="photoCropSize" min="50" max="100" step="1" value="100"><span id="photoCropSizeVal">100%</span></div>
+    <div class="row">
+      <div><label>Target size (KB) — just under the limit</label><input type="number" id="photoTargetKB" min="1"></div>
+      <div><label>Output format</label><select id="photoFormat"><option value="image/jpeg">JPEG (.jpg) — recommended</option><option value="image/png">PNG (.png) — no compression</option></select></div>
+    </div>
+    <button type="button" id="processPhotoBtn" disabled>Process photo</button>
+    <div class="progress" id="photoProgress"></div>
+    <div class="result" id="photoResult" style="display:none">
+      <figure class="compare"><img id="photoOrigImg" alt="Original cropped photo"><figcaption id="photoOrigCap"></figcaption></figure>
+      <figure class="compare"><img id="photoOut" alt="Processed photo preview"><figcaption id="photoOutCap"></figcaption></figure>
+      <div class="meta" id="photoMeta"></div>
+    </div>
+    <div style="margin-top:10px"><button type="button" id="downloadPhotoBtn" disabled>Download photo</button></div>
+  </section>
+
+  <!-- STEP 3: SIGNATURE -->
+  <section>
+    <h2>3 · Signature — upload, crop, compress</h2>
+    <p style="font-size:.92rem;color:#4a5a6a;">Sign on plain white paper with dark ink, photograph or scan it, then crop to the signature only.</p>
+    <input type="file" id="sigInput" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+    <button type="button" class="secondary" id="sampleSigBtn">Load a sample signature instead</button>
+    <button type="button" class="secondary" id="resetSigBtn">Reset crop</button>
+    <div class="error-box" id="sigError" role="alert"></div>
+    <div class="orig-info" id="sigOrigInfo"></div>
+    <div class="crop-stage" id="sigStage">
+      <div class="crop-empty" id="sigEmpty">Upload a signature image (or load the sample) to start cropping.<br>Drag to move it under the frame.</div>
+      <img id="sigImg" alt="" draggable="false" style="display:none">
+      <div class="crop-window" id="sigWindow" style="display:none"></div>
+    </div>
+    <div class="slider-row"><label for="sigZoom" style="white-space:nowrap">Zoom</label><input type="range" id="sigZoom" min="1" max="4" step="0.01" value="1"><span id="sigZoomVal">1.00×</span></div>
+    <div class="slider-row"><label for="sigCropSize" style="white-space:nowrap">Crop size</label><input type="range" id="sigCropSize" min="50" max="100" step="1" value="100"><span id="sigCropSizeVal">100%</span></div>
+    <div class="row">
+      <div><label>Target size (KB) — just under the limit</label><input type="number" id="sigTargetKB" min="1"></div>
+    </div>
+    <button type="button" id="processSigBtn" disabled>Process signature</button>
+    <div class="progress" id="sigProgress"></div>
+    <div class="result" id="sigResult" style="display:none">
+      <figure class="compare"><img id="sigOrigImg" alt="Original cropped signature"><figcaption id="sigOrigCap"></figcaption></figure>
+      <figure class="compare"><img id="sigOut" alt="Processed signature preview"><figcaption id="sigOutCap"></figcaption></figure>
+      <div class="meta" id="sigMeta"></div>
+    </div>
+    <div style="margin-top:10px"><button type="button" id="downloadSigBtn" disabled>Download signature</button></div>
+  </section>
+
+  <!-- STEP 4: CHECKLIST -->
+  <section>
+    <h2>4 · Ready to upload?</h2>
+    <div id="checklist">
+      <p>Process a photo to see its checks here.</p>
+    </div>
+    <div class="warn"><strong>Before you submit:</strong> form rules change every cycle. Always re-check the current notice for your form — the preset values here are from the sources below, checked 5 Nov 2026, and the form's own instructions win if they differ.</div>
+    <h3>Sources for the presets</h3>
+    <ul>
+      <li><strong>JEE Main (NTA):</strong> NTA Information Bulletin — photo JPEG 10–200 KB, 3.5 × 4.5 cm; signature JPEG 4–30 KB, 3.5 × 1.5 cm (2026 bulletin). Reports for the 2027 session give the signature as 10–100 KB — check your session's bulletin. Official portal: jeemain.nta.nic.in</li>
+      <li><strong>Indian Passport (Passport Seva 2.0):</strong> Passport Seva / Ministry of External Affairs ICAO spec — exactly 630 × 810 px (35 × 45 mm), JPEG 10–250 KB. The 2 × 2 in (51 × 51 mm) square is for OCI cards and e-Visas, not the passport. Official portal: passportindia.gov.in</li>
+      <li><strong>OCI / Indian e-Visa:</strong> 51 × 51 mm square, 600 × 600 px, JPEG 10–300 KB. Official portals: ociservices.gov.in / indianvisaonline.gov.in</li>
+      <li><strong>Exam Form A (50 KB):</strong> the example shown in the Week 2 project PDF preview — 3.5 × 4.5 cm, 50 KB limit.</li>
+    </ul>
+    <footer>BSERC GenAI Internship · Week 2 · Section A · Form Photo Fixer. Built as one offline HTML file. No file leaves your device.</footer>
+  </section>
+
+</main>
+<div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+<script>
+"use strict";
+
+/* ---------- Toasts ---------- */
+function showToast(message, type) {
+  const wrap = document.getElementById("toastWrap");
+  const t = document.createElement("div");
+  t.className = "toast" + (type ? " " + type : "");
+  t.textContent = message;
+  wrap.appendChild(t);
+  setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 4000);
+}
+
+/* ---------- Upload validation: JPEG/JPG/PNG only ---------- */
+var ACCEPTED_TYPES = ["image/jpeg", "image/png"];
+var ACCEPTED_EXTS = [".jpg", ".jpeg", ".png"];
+function validateImageFile(file) {
+  if (!file) return { ok: false, error: "No file selected." };
+  var name = (file.name || "").toLowerCase();
+  var extOk = ACCEPTED_EXTS.some(function (e) { return name.slice(-e.length) === e; });
+  var typeOk = !file.type || ACCEPTED_TYPES.indexOf(file.type) !== -1;
+  if (!typeOk || !extOk) {
+    return { ok: false, error: "“" + (file.name || "That file") + "” is not a JPEG or PNG image. Please choose a .jpg, .jpeg or .png file." };
+  }
+  return { ok: true };
+}
+function typeLabel(type) {
+  if (type === "image/png") return "PNG";
+  if (type === "image/jpeg") return "JPEG";
+  return type || "image";
+}
+
+/* ---------- Presets ---------- */
+const PRESETS = [
+  { id: "jee", name: "JEE Main (NTA)", photo: { w: 350, h: 450, minKB: 10, maxKB: 200 }, sig: { w: 350, h: 150, minKB: 4, maxKB: 30 },
+    source: "NTA Information Bulletin 2026: photo JPEG 10–200 KB, 3.5 × 4.5 cm; signature JPEG 4–30 KB, 3.5 × 1.5 cm. 2027 reports give the signature as 10–100 KB — check your session bulletin." },
+  { id: "passport", name: "Indian Passport — Passport Seva 2.0", photo: { w: 630, h: 810, minKB: 10, maxKB: 250 }, sig: null,
+    source: "Passport Seva / MEA ICAO spec: exactly 630 × 810 px (35 × 45 mm), JPEG 10–250 KB. The 2 × 2 in square is for OCI/e-Visa, not the passport." },
+  { id: "oci", name: "OCI / Indian e-Visa (square)", photo: { w: 600, h: 600, minKB: 10, maxKB: 300 }, sig: null,
+    source: "OCI / e-Visa portals: 51 × 51 mm square, 600 × 600 px, JPEG 10–300 KB." },
+  { id: "exam50", name: "Exam Form A — 50 KB limit", photo: { w: 350, h: 450, minKB: 10, maxKB: 50 }, sig: { w: 350, h: 150, minKB: 4, maxKB: 30 },
+    source: "Example from the Week 2 project PDF preview: 3.5 × 4.5 cm, 50 KB limit." },
+];
+let currentPreset = PRESETS[0];
+
+/* ---------- Generic cropper ---------- */
+function makeCropper(cfg) {
+  const stage = document.getElementById(cfg.stageId);
+  const img = document.getElementById(cfg.imgId);
+  const win = document.getElementById(cfg.winId);
+  const empty = document.getElementById(cfg.emptyId);
+  const zoom = document.getElementById(cfg.zoomId);
+  const zoomVal = document.getElementById(cfg.zoomValId);
+  const cropSize = document.getElementById(cfg.cropSizeId);
+  const cropSizeVal = document.getElementById(cfg.cropSizeValId);
+  const infoEl = document.getElementById(cfg.infoId);
+  const errorEl = document.getElementById(cfg.errorId);
+  const state = { loaded: false, naturalW: 0, naturalH: 0, baseScale: 1, scale: 1, cropSize: 1, x: 0, y: 0, dragging: false, lastX: 0, lastY: 0, orig: null };
+
+  function showError(message) {
+    errorEl.textContent = message;
+    errorEl.style.display = "block";
+    showToast(message, "error");
+  }
+  function clearError() { errorEl.textContent = ""; errorEl.style.display = "none"; }
+  function showOrigInfo() {
+    if (!state.orig) { infoEl.textContent = ""; return; }
+    const o = state.orig;
+    infoEl.textContent = "Original: " + o.name + " — " + o.w + " × " + o.h + " px · " + kb(o.size) + " KB · " + typeLabel(o.type);
+  }
+
+  function windowRect() {
+    const aspect = cfg.aspect();
+    const maxW = stage.clientWidth * 0.92 * state.cropSize, maxH = 300 * state.cropSize;
+    let w = maxW, h = w / aspect;
+    if (h > maxH) { h = maxH; w = h * aspect; }
+    const x = (stage.clientWidth - w) / 2, y = (stage.clientHeight - h) / 2;
+    return { x, y, w, h };
+  }
+  function layout() {
+    if (!state.loaded) return;
+    const r = windowRect();
+    win.style.display = "block";
+    win.style.left = r.x + "px"; win.style.top = r.y + "px";
+    win.style.width = r.w + "px"; win.style.height = r.h + "px";
+    // Fit image so it covers the window, then apply zoom.
+    const fit = Math.max(r.w / state.naturalW, r.h / state.naturalH);
+    state.baseScale = fit;
+    const s = fit * state.scale;
+    const dw = state.naturalW * s, dh = state.naturalH * s;
+    // Clamp pan so the window stays covered.
+    const minX = r.x + r.w - dw, maxX = r.x, minY = r.y + r.h - dh, maxY = r.y;
+    state.x = Math.min(maxX, Math.max(minX, state.x));
+    state.y = Math.min(maxY, Math.max(minY, state.y));
+    img.style.width = dw + "px"; img.style.height = dh + "px";
+    img.style.transform = "translate(" + state.x + "px," + state.y + "px)";
+    zoomVal.textContent = state.scale.toFixed(2) + "×";
+    cropSizeVal.textContent = Math.round(state.cropSize * 100) + "%";
+  }
+  function loadImage(src, origMeta) {
+    const im = new Image();
+    im.onload = function () {
+      state.naturalW = im.naturalWidth; state.naturalH = im.naturalHeight;
+      state.loaded = true; state.scale = 1;
+      if (origMeta) {
+        state.orig = origMeta;
+        state.orig.w = state.naturalW; state.orig.h = state.naturalH;
+      } else if (src.indexOf("data:") === 0) {
+        // Sample image generated in-page: estimate its byte size from the data URL.
+        const comma = src.indexOf(",");
+        state.orig = { name: cfg.kind === "Photo" ? "sample-photo.jpg" : "sample-signature.jpg", type: "image/jpeg", size: Math.round((src.length - comma - 1) * 0.75), w: state.naturalW, h: state.naturalH };
+      } else {
+        state.orig = { name: "image", type: "", size: 0, w: state.naturalW, h: state.naturalH };
+      }
+      clearError();
+      showOrigInfo();
+      img.src = src; img.style.display = "block"; empty.style.display = "none";
+      // Centre the image on the window.
+      const r = windowRect();
+      const fit = Math.max(r.w / state.naturalW, r.h / state.naturalH);
+      state.x = r.x + (r.w - state.naturalW * fit) / 2;
+      state.y = r.y + (r.h - state.naturalH * fit) / 2;
+      layout();
+      cfg.onLoad();
+      showToast(cfg.kind + " loaded: " + state.naturalW + " × " + state.naturalH + " px.", "success");
+    };
+    im.onerror = function () {
+      state.loaded = false;
+      showError("That file could not be read as an image — it may be corrupt or not a real JPEG/PNG. Please try a different .jpg or .png file.");
+      if (cfg.onError) cfg.onError();
+    };
+    im.src = src;
+  }
+  function loadFile(file) {
+    if (!file) return;
+    const check = validateImageFile(file);
+    if (!check.ok) { showError(check.error); if (cfg.onError) cfg.onError(); return; }
+    const reader = new FileReader();
+    reader.onerror = function () { showError("Could not read “" + file.name + "”. Please try the file again."); };
+    reader.onload = function (e) {
+      loadImage(e.target.result, { name: file.name, type: file.type, size: file.size, w: 0, h: 0 });
+    };
+    reader.readAsDataURL(file);
+  }
+  img.addEventListener("pointerdown", function (e) {
+    state.dragging = true; state.lastX = e.clientX; state.lastY = e.clientY;
+    img.setPointerCapture(e.pointerId);
+  });
+  img.addEventListener("pointermove", function (e) {
+    if (!state.dragging) return;
+    state.x += e.clientX - state.lastX; state.y += e.clientY - state.lastY;
+    state.lastX = e.clientX; state.lastY = e.clientY; layout();
+  });
+  img.addEventListener("pointerup", function () { state.dragging = false; });
+  img.addEventListener("pointercancel", function () { state.dragging = false; });
+  zoom.addEventListener("input", function () { state.scale = parseFloat(zoom.value); layout(); });
+  cropSize.addEventListener("input", function () { state.cropSize = parseFloat(cropSize.value) / 100; layout(); });
+  window.addEventListener("resize", layout);
+
+  function exportCrop(outW, outH) {
+    // Source rectangle in natural-image pixels.
+    const r = windowRect();
+    const s = state.baseScale * state.scale;
+    const sx = (r.x - state.x) / s, sy = (r.y - state.y) / s;
+    const sw = r.w / s, sh = r.h / s;
+    const canvas = document.createElement("canvas");
+    canvas.width = outW; canvas.height = outH;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, outW, outH);
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
+    return canvas;
+  }
+  return {
+    state, loadFile, loadImage, layout, showError,
+    reset: function () { state.scale = 1; state.cropSize = 1; zoom.value = "1"; cropSize.value = "100"; layout(); },
+    setCropSize: function (v) { state.cropSize = v; cropSize.value = String(Math.round(v * 100)); layout(); },
+    exportCrop
+  };
+}
+
+/* ---------- Croppers ---------- */
+const photoCrop = makeCropper({
+  stageId: "photoStage", imgId: "photoImg", winId: "photoWindow", emptyId: "photoEmpty",
+  zoomId: "photoZoom", zoomValId: "photoZoomVal", cropSizeId: "photoCropSize", cropSizeValId: "photoCropSizeVal",
+  infoId: "photoOrigInfo", errorId: "photoError", kind: "Photo",
+  aspect: function () { return currentPreset.photo.w / currentPreset.photo.h; },
+  onLoad: function () { document.getElementById("processPhotoBtn").disabled = false; },
+  onError: function () { document.getElementById("processPhotoBtn").disabled = true; }
+});
+const sigCrop = makeCropper({
+  stageId: "sigStage", imgId: "sigImg", winId: "sigWindow", emptyId: "sigEmpty",
+  zoomId: "sigZoom", zoomValId: "sigZoomVal", cropSizeId: "sigCropSize", cropSizeValId: "sigCropSizeVal",
+  infoId: "sigOrigInfo", errorId: "sigError", kind: "Signature",
+  aspect: function () { const s = currentPreset.sig; return s ? s.w / s.h : 350 / 150; },
+  onLoad: function () { document.getElementById("processSigBtn").disabled = false; },
+  onError: function () { document.getElementById("processSigBtn").disabled = true; }
+});
+
+document.getElementById("photoInput").addEventListener("change", function (e) { photoCrop.loadFile(e.target.files[0]); });
+document.getElementById("sigInput").addEventListener("change", function (e) { sigCrop.loadFile(e.target.files[0]); });
+document.getElementById("resetPhotoBtn").addEventListener("click", function () { photoCrop.reset(); });
+document.getElementById("resetSigBtn").addEventListener("click", function () { sigCrop.reset(); });
+
+/* Sample images (drawn locally — fake data, for testing only) */
+function samplePhotoDataURL() {
+  const c = document.createElement("canvas"); c.width = 800; c.height = 1000;
+  const x = c.getContext("2d");
+  const g = x.createLinearGradient(0, 0, 0, 1000); g.addColorStop(0, "#cfe8f5"); g.addColorStop(1, "#8fb8d8");
+  x.fillStyle = g; x.fillRect(0, 0, 800, 1000);
+  x.fillStyle = "#f2c89b"; x.beginPath(); x.arc(400, 380, 150, 0, Math.PI * 2); x.fill(); // head
+  x.fillStyle = "#3a5a7a"; x.beginPath(); x.ellipse(400, 950, 330, 260, 0, Math.PI, 0); x.fill(); // shoulders
+  x.fillStyle = "#2b2b2b"; x.beginPath(); x.arc(400, 300, 155, Math.PI, 0); x.fill(); // hair
+  x.fillStyle = "#fff"; x.font = "28px sans-serif"; x.fillText("SAMPLE PHOTO", 300, 60);
+  return c.toDataURL("image/jpeg", 0.92);
+}
+function sampleSigDataURL() {
+  const c = document.createElement("canvas"); c.width = 700; c.height = 300;
+  const x = c.getContext("2d");
+  x.fillStyle = "#ffffff"; x.fillRect(0, 0, 700, 300);
+  x.strokeStyle = "#111"; x.lineWidth = 5; x.lineCap = "round";
+  x.beginPath(); x.moveTo(60, 200);
+  x.bezierCurveTo(150, 80, 220, 260, 320, 140);
+  x.bezierCurveTo(400, 60, 480, 240, 620, 150);
+  x.stroke();
+  x.fillStyle = "#111"; x.font = "24px sans-serif"; x.fillText("SAMPLE SIGNATURE", 200, 40);
+  return c.toDataURL("image/jpeg", 0.92);
+}
+document.getElementById("samplePhotoBtn").addEventListener("click", function () { photoCrop.loadImage(samplePhotoDataURL()); });
+document.getElementById("sampleSigBtn").addEventListener("click", function () { sigCrop.loadImage(sampleSigDataURL()); });
+
+/* ---------- Presets UI ---------- */
+/* Custom presets persist in localStorage so they are still there next time. */
+const CUSTOM_KEY = "fpf-custom-presets-v1";
+function loadCustomPresets() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CUSTOM_KEY) || "[]");
+    if (Array.isArray(saved)) {
+      saved.forEach(function (p) { p.custom = true; PRESETS.push(p); });
+    }
+  } catch (e) { /* corrupt saved data: start with built-ins only */ }
+}
+function saveCustomPresets() {
+  try {
+    localStorage.setItem(CUSTOM_KEY, JSON.stringify(PRESETS.filter(function (p) { return p.custom; })));
+  } catch (e) { /* storage full or unavailable: presets still work for this session */ }
+}
+loadCustomPresets();
+
+const presetList = document.getElementById("presetList");
+function renderPresets() {
+  presetList.innerHTML = "";
+  PRESETS.forEach(function (p) {
+    const d = document.createElement("div");
+    d.className = "preset" + (p === currentPreset ? " selected" : "");
+    d.innerHTML = "<b></b><div class='spec'></div><small></small>";
+    d.querySelector("b").textContent = p.name;
+    d.querySelector(".spec").textContent = "Photo " + p.photo.w + "×" + p.photo.h + " px · " + p.photo.minKB + "–" + p.photo.maxKB + " KB" +
+      (p.sig ? " · Signature " + p.sig.w + "×" + p.sig.h + " px · " + p.sig.minKB + "–" + p.sig.maxKB + " KB" : " · No signature");
+    d.querySelector("small").textContent = p.source;
+    if (p.custom) {
+      const del = document.createElement("button");
+      del.type = "button"; del.className = "del"; del.textContent = "✕ Delete";
+      del.title = "Delete this custom preset";
+      del.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        const idx = PRESETS.indexOf(p);
+        if (idx !== -1) PRESETS.splice(idx, 1);
+        saveCustomPresets();
+        if (currentPreset === p) currentPreset = PRESETS[0];
+        renderPresets();
+        showToast("Custom preset “" + p.name + "” deleted.", "success");
+      });
+      d.appendChild(del);
+    }
+    d.addEventListener("click", function () { selectPreset(p); });
+    presetList.appendChild(d);
+  });
+  document.getElementById("presetSource").textContent = currentPreset.source;
+  document.getElementById("photoTargetKB").value = Math.round(currentPreset.photo.maxKB * 0.95);
+  const sigTarget = document.getElementById("sigTargetKB");
+  sigTarget.value = currentPreset.sig ? Math.round(currentPreset.sig.maxKB * 0.95) : 30;
+  sigTarget.disabled = !currentPreset.sig;
+  document.getElementById("processSigBtn").disabled = !currentPreset.sig || !sigCrop.state.loaded;
+  photoCrop.setCropSize(1); sigCrop.setCropSize(1);
+  photoCrop.layout(); sigCrop.layout();
+}
+function selectPreset(p) { currentPreset = p; renderPresets(); }
+renderPresets();
+
+document.getElementById("addCustomBtn").addEventListener("click", function () {
+  const name = document.getElementById("customName").value.trim() || "Custom form";
+  const pw = +document.getElementById("customPhotoW").value, ph = +document.getElementById("customPhotoH").value;
+  const pmin = +document.getElementById("customPhotoMin").value, pmax = +document.getElementById("customPhotoMax").value;
+  const sw = +document.getElementById("customSigW").value, sh = +document.getElementById("customSigH").value;
+  const smin = +document.getElementById("customSigMin").value, smax = +document.getElementById("customSigMax").value;
+  if (!pw || !ph || !pmax || pmax <= pmin) {
+    showToast("Check the custom preset numbers: photo width/height and a max KB above the min KB are required.", "error");
+    return;
+  }
+  const p = { id: "custom-" + Date.now(), custom: true, name: name + " (custom)", photo: { w: pw, h: ph, minKB: pmin, maxKB: pmax },
+    sig: sw > 0 && sh > 0 ? { w: sw, h: sh, minKB: smin, maxKB: smax } : null,
+    source: "Custom preset entered by you — verify these numbers against the form's official notice before submitting." };
+  PRESETS.push(p);
+  saveCustomPresets();
+  selectPreset(p);
+  showToast("Custom preset “" + p.name + "” saved — it will still be here next time you open this page.", "success");
+});
+
+/* ---------- Compression: step quality down until just under the target ---------- */
+function canvasToBlob(canvas, format, quality) {
+  return new Promise(function (resolve) { canvas.toBlob(function (b) { resolve(b); }, format, quality); });
+}
+async function compressToTarget(canvas, format, targetBytes, onStep) {
+  if (format === "image/png") {
+    const blob = await canvasToBlob(canvas, format);
+    if (onStep) onStep(null, blob.size);
+    return { blob: blob, quality: null };
+  }
+  let quality = 0.92, blob = await canvasToBlob(canvas, format, quality);
+  if (onStep) onStep(quality, blob.size);
+  while (blob.size > targetBytes && quality > 0.05) {
+    quality = Math.max(0.05, quality - 0.04);
+    blob = await canvasToBlob(canvas, format, quality);
+    if (onStep) onStep(quality, blob.size);
+  }
+  return { blob: blob, quality: quality };
+}
+function kb(bytes) { return (bytes / 1024).toFixed(1); }
+function downloadBlob(blob, filename) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+}
+
+let photoBlob = null, sigBlob = null;
+const checks = { photo: null, sig: null };
+
+function renderChecklist() {
+  const el = document.getElementById("checklist");
+  const rows = [];
+  if (checks.photo) {
+    rows.push("<p>" + (checks.photo.ok ? "<span class='ok'>✓</span>" : "<span class='bad'>✗</span>") +
+      " Photo: " + checks.photo.w + "×" + checks.photo.h + " px, " + kb(checks.photo.bytes) + " KB — limit " +
+      checks.photo.minKB + "–" + checks.photo.maxKB + " KB " + (checks.photo.ok ? "(ready to upload)" : "(outside the limit — adjust the target KB or crop)") + "</p>");
+  }
+  if (checks.sig) {
+    rows.push("<p>" + (checks.sig.ok ? "<span class='ok'>✓</span>" : "<span class='bad'>✗</span>") +
+      " Signature: " + checks.sig.w + "×" + checks.sig.h + " px, " + kb(checks.sig.bytes) + " KB — limit " +
+      checks.sig.minKB + "–" + checks.sig.maxKB + " KB " + (checks.sig.ok ? "(ready to upload)" : "(outside the limit)") + "</p>");
+  }
+  rows.push("<p><span class='pill'>Offline</span> No file left this device — all processing happened in this tab.</p>");
+  el.innerHTML = rows.join("");
+}
+
+document.getElementById("processPhotoBtn").addEventListener("click", async function () {
+  if (!photoCrop.state.loaded) return;
+  const btn = document.getElementById("processPhotoBtn");
+  const progress = document.getElementById("photoProgress");
+  const p = currentPreset.photo;
+  const format = document.getElementById("photoFormat").value;
+  const targetKB = +document.getElementById("photoTargetKB").value || Math.round(p.maxKB * 0.95);
+  btn.disabled = true; btn.textContent = "Processing…";
+  progress.style.display = "block"; progress.textContent = "Cropping to " + p.w + " × " + p.h + " px, then compressing…";
+  try {
+    const canvas = photoCrop.exportCrop(p.w, p.h);
+    // Original = the same crop at best quality (JPEG 100% / PNG), before the
+    // quality is stepped down. JPEG size grows with quality, so this is always
+    // at least as big as the processed file.
+    const origBlob = await canvasToBlob(canvas, format, format === "image/jpeg" ? 1.0 : undefined);
+    const out = await compressToTarget(canvas, format, targetKB * 1024, function (q, size) {
+      progress.textContent = q === null
+        ? "PNG has no quality setting — writing " + kb(size) + " KB…"
+        : "Compressing… quality " + Math.round(q * 100) + "% — " + kb(size) + " KB (target ≤ " + targetKB + " KB)";
+    });
+    photoBlob = out.blob;
+    document.getElementById("photoOrigImg").src = URL.createObjectURL(origBlob);
+    document.getElementById("photoOrigImg").style.width = Math.min(p.w, 220) + "px";
+    document.getElementById("photoOrigCap").innerHTML = "<b>Original (cropped, best quality)</b><br>" + p.w + " × " + p.h + " px · " + kb(origBlob.size) + " KB";
+    document.getElementById("photoOut").src = URL.createObjectURL(out.blob);
+    document.getElementById("photoOut").style.width = Math.min(p.w, 220) + "px";
+    document.getElementById("photoOutCap").innerHTML = "<b>Processed</b><br>" + p.w + " × " + p.h + " px · " + kb(out.blob.size) + " KB";
+    document.getElementById("photoResult").style.display = "flex";
+    const ok = out.blob.size >= p.minKB * 1024 && out.blob.size <= p.maxKB * 1024;
+    const savedKB = (origBlob.size - out.blob.size) / 1024;
+    const savedPct = origBlob.size > 0 ? Math.round((1 - out.blob.size / origBlob.size) * 100) : 0;
+    checks.photo = { ok: ok, w: p.w, h: p.h, bytes: out.blob.size, minKB: p.minKB, maxKB: p.maxKB };
+    document.getElementById("photoMeta").innerHTML =
+      "<strong>" + p.w + " × " + p.h + " px</strong><br>Size: <strong>" + kb(origBlob.size) + " KB → " + kb(out.blob.size) + " KB</strong> (target ≤ " + targetKB + " KB)<br>" +
+      "Saved: <strong>" + savedKB.toFixed(1) + " KB (" + savedPct + "%)</strong><br>" +
+      "Limit: " + p.minKB + "–" + p.maxKB + " KB<br>" +
+      (format === "image/jpeg" ? "JPEG quality used: " + (out.quality * 100).toFixed(0) + "%<br>" : "PNG — no quality setting; the processed file is the same as the original crop.<br>") +
+      (ok ? "<span class='ok'>✓ Ready to upload</span>" : "<span class='bad'>✗ Outside the " + p.minKB + "–" + p.maxKB + " KB limit</span>" +
+        (out.blob.size < p.minKB * 1024 ? " — the file is below the minimum; a busier photo usually fixes this." : " — lower the target KB and process again."));
+    document.getElementById("downloadPhotoBtn").disabled = false;
+    progress.textContent = ok ? "Done — " + kb(out.blob.size) + " KB, inside the " + p.minKB + "–" + p.maxKB + " KB limit." : "Done, but the result is outside the " + p.minKB + "–" + p.maxKB + " KB limit — see the notes above.";
+    showToast(ok ? "Photo ready: " + kb(out.blob.size) + " KB, " + savedKB.toFixed(1) + " KB saved." : "Photo processed, but it is outside the size limit.", ok ? "success" : "error");
+    renderChecklist();
+  } finally {
+    btn.disabled = false; btn.textContent = "Process photo";
+  }
+});
+
+document.getElementById("processSigBtn").addEventListener("click", async function () {
+  if (!sigCrop.state.loaded || !currentPreset.sig) return;
+  const btn = document.getElementById("processSigBtn");
+  const progress = document.getElementById("sigProgress");
+  const s = currentPreset.sig;
+  const targetKB = +document.getElementById("sigTargetKB").value || Math.round(s.maxKB * 0.95);
+  btn.disabled = true; btn.textContent = "Processing…";
+  progress.style.display = "block"; progress.textContent = "Cropping to " + s.w + " × " + s.h + " px, then compressing…";
+  try {
+    const canvas = sigCrop.exportCrop(s.w, s.h);
+    // Original = the same crop at best quality (JPEG 100%), before compression.
+    const origBlob = await canvasToBlob(canvas, "image/jpeg", 1.0);
+    const out = await compressToTarget(canvas, "image/jpeg", targetKB * 1024, function (q, size) {
+      progress.textContent = "Compressing… quality " + Math.round(q * 100) + "% — " + kb(size) + " KB (target ≤ " + targetKB + " KB)";
+    });
+    sigBlob = out.blob;
+    document.getElementById("sigOrigImg").src = URL.createObjectURL(origBlob);
+    document.getElementById("sigOrigImg").style.width = Math.min(s.w, 260) + "px";
+    document.getElementById("sigOrigCap").innerHTML = "<b>Original (cropped, best quality)</b><br>" + s.w + " × " + s.h + " px · " + kb(origBlob.size) + " KB";
+    document.getElementById("sigOut").src = URL.createObjectURL(out.blob);
+    document.getElementById("sigOut").style.width = Math.min(s.w, 260) + "px";
+    document.getElementById("sigOutCap").innerHTML = "<b>Processed</b><br>" + s.w + " × " + s.h + " px · " + kb(out.blob.size) + " KB";
+    document.getElementById("sigResult").style.display = "flex";
+    const ok = out.blob.size >= s.minKB * 1024 && out.blob.size <= s.maxKB * 1024;
+    const savedKB = (origBlob.size - out.blob.size) / 1024;
+    const savedPct = origBlob.size > 0 ? Math.round((1 - out.blob.size / origBlob.size) * 100) : 0;
+    checks.sig = { ok: ok, w: s.w, h: s.h, bytes: out.blob.size, minKB: s.minKB, maxKB: s.maxKB };
+    document.getElementById("sigMeta").innerHTML =
+      "<strong>" + s.w + " × " + s.h + " px</strong><br>Size: <strong>" + kb(origBlob.size) + " KB → " + kb(out.blob.size) + " KB</strong> (target ≤ " + targetKB + " KB)<br>" +
+      "Saved: <strong>" + savedKB.toFixed(1) + " KB (" + savedPct + "%)</strong><br>" +
+      "Limit: " + s.minKB + "–" + s.maxKB + " KB<br>JPEG quality used: " + (out.quality * 100).toFixed(0) + "%<br>" +
+      (ok ? "<span class='ok'>✓ Ready to upload</span>" : "<span class='bad'>✗ Outside the " + s.minKB + "–" + s.maxKB + " KB limit</span>");
+    document.getElementById("downloadSigBtn").disabled = false;
+    progress.textContent = ok ? "Done — " + kb(out.blob.size) + " KB, inside the " + s.minKB + "–" + s.maxKB + " KB limit." : "Done, but the result is outside the " + s.minKB + "–" + s.maxKB + " KB limit.";
+    showToast(ok ? "Signature ready: " + kb(out.blob.size) + " KB, " + savedKB.toFixed(1) + " KB saved." : "Signature processed, but it is outside the size limit.", ok ? "success" : "error");
+    renderChecklist();
+  } finally {
+    btn.disabled = false; btn.textContent = "Process signature";
+  }
+});
+
+document.getElementById("downloadPhotoBtn").addEventListener("click", function () {
+  if (photoBlob) { downloadBlob(photoBlob, "photo-" + currentPreset.id + ".jpg"); showToast("Photo downloaded: photo-" + currentPreset.id + ".jpg (" + kb(photoBlob.size) + " KB).", "success"); }
+});
+document.getElementById("downloadSigBtn").addEventListener("click", function () {
+  if (sigBlob) { downloadBlob(sigBlob, "signature-" + currentPreset.id + ".jpg"); showToast("Signature downloaded: signature-" + currentPreset.id + ".jpg (" + kb(sigBlob.size) + " KB).", "success"); }
+});
+</script>
+</body>
+</html>
