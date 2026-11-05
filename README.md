@@ -107,7 +107,7 @@ There is nothing to install.
 
 To test offline: turn Wi-Fi off and reload the page — both apps still work, because neither file references anything outside itself.
 
-Live demo: both apps are also deployed on Vercel (links in the Screenshots section below). The deployments update automatically whenever this repository changes, because each Vercel project builds from its app folder (`form-photo-fixer/` and `resume-builder/`).
+Live demo: both apps are also deployed on Vercel (links in the Screenshots section below). The deployments are updated manually after changes to the repository — the repository's automatic Vercel deploys currently produce empty pages because Vercel cannot read the repo (no GitHub login connection on the Vercel account), so they are switched off and the links above always point at the latest working manual deployment.
 
 Optional: serve the folder over a local static server (e.g. `python3 -m http.server`) if you prefer a URL to a file path; it is not required.
 
