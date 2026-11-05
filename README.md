@@ -91,7 +91,10 @@ bserc-week2-section-a-projects/
     ├── form-photo-fixer-requirements.md
     ├── resume-builder-requirements.md
     ├── testing-report.md
-    └── official-form-references.md
+    ├── official-form-references.md
+    └── screenshots/
+        ├── form-photo-fixer.png
+        └── resume-builder.png
 ```
 
 ## Installation and execution
@@ -108,7 +111,15 @@ Optional: serve the folder over a local static server (e.g. `python3 -m http.ser
 
 ## Screenshots
 
-> **Screenshots are not included yet.** No screenshots have been taken for this repository, and none are fabricated here. Screenshots of both applications will be added to this section after the Vercel deployment, taken from the deployed apps running in a real browser.
+Both screenshots below are genuine captures of the deployed apps running in a real browser (5 Nov 2026), using the fake sample data only — nothing staged or mocked up. Try them live: [Form Photo Fixer](https://form-photo-fixer-bserc-meet29.vercel.app/) · [Resume Builder](https://resume-builder-bserc-meet29.vercel.app/).
+
+### Form Photo Fixer
+
+![Form Photo Fixer — preset cards for JEE Main, Indian Passport, OCI/e-Visa and Exam Form A](docs/screenshots/form-photo-fixer.png)
+
+### Resume Builder
+
+![Resume Builder — editor with template picker and section order on the left, live A4 preview of the sample resume on the right](docs/screenshots/resume-builder.png)
 
 ## Testing and validation
 
@@ -156,7 +167,7 @@ These are listed as to-verify items in each app's `test-checklist.md`, not as pa
 
 - Form Photo Fixer: more form presets as official notices are checked; a background-colour check/warning; EXIF orientation handling for phone photos.
 - Resume Builder: more templates; a one-page-fit option; import from LinkedIn-style data (only with the user's own export file, still fully offline).
-- Both apps: screenshots in this README after deployment; a shared Vercel deployment link; end-to-end tests in a real browser (Playwright) once a browser is available in the build environment.
+- Both apps: end-to-end tests in a real browser (Playwright) once a browser is available in the build environment; the live deployments are already linked from the Screenshots section above.
 - Packaging: a single ZIP of the two apps for the BSERC submission, alongside the Week 1 submission files.
 
 ## Licence
