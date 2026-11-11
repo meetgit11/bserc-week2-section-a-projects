@@ -178,4 +178,4 @@ MIT — see `LICENSE`. The MIT licence covers the **original code in this reposi
 
 ---
 
-*BSERC GenAI Internship — Week 2, Section A. Built with AI-assisted development (Muse + ChatGPT planning, Muse building), tested headlessly as documented above, with the real-browser checks listed under "Honest gaps" still to be done on the author's machine.*
+*BSERC GenAI Internship — Week 2, Section A. Built with AI-assisted development, tested headlessly as documented above, with the real-browser checks listed under "Honest gaps" still to be done on the author's machine.*
