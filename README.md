@@ -30,7 +30,7 @@ Get a photo and signature ready for exam and job application forms in one step, 
 
 A fake sample photo (`form-photo-fixer/public/sample-photo.jpg`, drawn locally, clearly labelled SAMPLE) and a built-in sample signature are included so the tool can be tested without a real photo.
 
-## Project 2 — Resume Builder
+## Project 2 — Resume Builder 
 
 `resume-builder/` — open `resume-builder/index.html` in any browser.
 
